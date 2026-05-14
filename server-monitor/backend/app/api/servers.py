@@ -11,15 +11,14 @@ POST   /api/servers/{id}/ping → ping manual inmediato
 =============================================================
 """
 
-from fastapi import APIRouter, Depends, HTTPException, status, Request
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.api.schemas import ManualPingOut, ServerCreate, ServerOut, ServerUpdate
 from app.core.database import get_db
 from app.models import Server
-from app.api.schemas import ServerCreate, ServerOut, ServerUpdate
-from app.services.ping_service import ping_host
-from app.core.config import get_settings
+from app.services.monitor_service import check_server
 
 
 router = APIRouter()
@@ -47,11 +46,16 @@ async def list_servers(db: AsyncSession = Depends(get_db)):
 async def create_server(payload: ServerCreate, db: AsyncSession = Depends(get_db)):
     """
     Crea un nuevo servidor en la base de datos.
-    El estado inicial es 'unknown' hasta la primera ronda de monitorización.
+    Si el servidor queda activo, ejecuta una comprobacion inicial para
+    evitar que arranque en estado desconocido.
     """
     server = Server(**payload.model_dump())
     db.add(server)
     await db.flush()
+
+    if server.is_active:
+        await check_server(server, db, send_alerts=False)
+
     await db.refresh(server)
     return server
 
@@ -82,6 +86,7 @@ async def update_server(
     Los campos no incluidos en el payload no se modifican.
     """
     server = await _get_server_or_404(server_id, db)
+    previous_is_active = server.is_active
 
     # Actualizamos solo los campos que vienen en el payload (PATCH semántico)
     update_data = payload.model_dump(exclude_unset=True)
@@ -89,6 +94,13 @@ async def update_server(
         setattr(server, field, value)
 
     await db.flush()
+
+    should_run_initial_check = server.is_active and (
+        not previous_is_active or "ip_address" in update_data
+    )
+    if should_run_initial_check:
+        await check_server(server, db, send_alerts=False)
+
     await db.refresh(server)
     return server
 
@@ -111,32 +123,28 @@ async def delete_server(server_id: int, db: AsyncSession = Depends(get_db)):
 # POST /api/servers/{id}/ping — Ping manual inmediato
 # ---------------------------------------------------------------------------
 
-@router.post("/{server_id}/ping")
+@router.post("/{server_id}/ping", response_model=ManualPingOut)
 async def manual_ping(
     server_id: int,
-    request: Request,
     db: AsyncSession = Depends(get_db),
 ):
     """
-    Lanza un ping inmediato al servidor fuera del ciclo del scheduler.
-    Útil para verificar la conectividad desde la interfaz de usuario.
-    No actualiza el estado en BD (es solo diagnóstico).
+    Lanza una comprobacion inmediata, persiste estado y log,
+    pero no dispara correos de alerta.
     """
     server = await _get_server_or_404(server_id, db)
-    cfg = get_settings()
-
-    result = await ping_host(
-        host=server.ip_address,
-        count=cfg.ping_count,
-        timeout=cfg.ping_timeout_seconds,
-    )
+    result = await check_server(server, db, send_alerts=False)
+    await db.refresh(server)
 
     return {
         "server_id": server_id,
+        "server_name": server.name,
         "ip_address": server.ip_address,
-        "success": result.success,
+        "success": result.status == "up",
+        "last_status": server.last_status,
         "response_ms": result.response_ms,
-        "error": result.error,
+        "error": result.error_message,
+        "checked_at": result.checked_at,
     }
 
 

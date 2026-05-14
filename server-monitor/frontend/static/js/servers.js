@@ -1,15 +1,14 @@
 /**
- * servers.js — Lógica de la vista "Servidores" (CRUD)
+ * servers.js - Logica de la vista "Servidores" (CRUD)
  *
  * Responsabilidades:
  *  - Renderizar la tabla de servidores.
- *  - Gestionar el modal de creación/edición.
+ *  - Gestionar el modal de creacion/edicion.
  *  - Lanzar pings manuales.
  *  - Eliminar servidores.
  */
 
-// Estado local de la vista de servidores
-let _editingServerId = null;   // null → creación, número → edición
+let _editingServerId = null;
 
 // ---------------------------------------------------------------------------
 // Renderizado de la tabla
@@ -37,109 +36,111 @@ function renderServersTable(servers) {
   const tbody = document.getElementById("servers-tbody");
 
   if (servers.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="7" class="loading-cell">No hay servidores. Añade uno con el botón "+".</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="7" class="loading-cell">No hay servidores. A&ntilde;ade uno con el bot&oacute;n "+".</td></tr>';
     return;
   }
 
-  tbody.innerHTML = servers.map(s => buildServerRow(s)).join("");
+  tbody.innerHTML = servers.map((server) => buildServerRow(server)).join("");
 }
 
 /**
  * Construye el HTML de una fila de la tabla de servidores.
  *
- * @param {object} s - Objeto servidor.
- * @returns {string} HTML de la fila <tr>.
+ * @param {object} server - Objeto servidor.
+ * @returns {string} HTML de la fila.
  */
-function buildServerRow(s) {
-  const badge    = `<span class="status-badge ${s.last_status}">${statusLabel(s.last_status)}</span>`;
-  const latency  = s.last_response_ms != null ? `${s.last_response_ms.toFixed(1)} ms` : "—";
-  const lastChk  = s.last_checked_at ? formatDateTime(s.last_checked_at) : "—";
-  const active   = s.is_active
-    ? '<span class="text-ok">●  Sí</span>'
-    : '<span class="text-muted">○  No</span>';
+function buildServerRow(server) {
+  const badge = `<span class="status-badge ${server.last_status}">${statusLabel(server.last_status)}</span>`;
+  const latency = server.last_response_ms != null ? `${server.last_response_ms.toFixed(1)} ms` : "--";
+  const lastCheck = server.last_checked_at ? formatDateTime(server.last_checked_at) : "--";
+  const deleteName = escapeHtml(JSON.stringify(server.name));
+  const active = server.is_active
+    ? '<span class="text-ok">&#9679; S&iacute;</span>'
+    : '<span class="text-muted">&#9675; No</span>';
 
   return `
-    <tr data-id="${s.id}">
-      <td>${escapeHtml(s.name)}</td>
-      <td class="mono">${escapeHtml(s.ip_address)}</td>
+    <tr data-id="${server.id}">
+      <td>${escapeHtml(server.name)}</td>
+      <td class="mono">${escapeHtml(server.ip_address)}</td>
       <td>${badge}</td>
       <td class="mono">${latency}</td>
-      <td>${lastChk}</td>
+      <td>${lastCheck}</td>
       <td>${active}</td>
       <td>
         <div style="display:flex;gap:6px;flex-wrap:wrap;">
-          <button class="btn btn-sm btn-ok"    onclick="handleManualPing(${s.id})">Ping</button>
-          <button class="btn btn-sm btn-ghost"  onclick="openEditModal(${s.id})">Editar</button>
-          <button class="btn btn-sm btn-danger" onclick="handleDeleteServer(${s.id}, '${escapeHtml(s.name)}')">Borrar</button>
+          <button class="btn btn-sm btn-ok" onclick="handleManualPing(${server.id})">Ping</button>
+          <button class="btn btn-sm btn-ghost" onclick="openEditModal(${server.id})">Editar</button>
+          <button class="btn btn-sm btn-danger" onclick='handleDeleteServer(${server.id}, ${deleteName})'>Borrar</button>
         </div>
       </td>
     </tr>
   `;
 }
 
-/** Devuelve la etiqueta legible de un estado. */
+/**
+ * Devuelve la etiqueta legible de un estado.
+ *
+ * @param {string} status - Estado interno.
+ * @returns {string} Estado legible.
+ */
 function statusLabel(status) {
-  return { up: "Operativo", down: "Caído", unknown: "Desconocido" }[status] || status;
+  return { up: "Operativo", down: "Ca&iacute;do", unknown: "Desconocido" }[status] || status;
 }
 
 // ---------------------------------------------------------------------------
-// Modal de creación / edición
+// Modal de creacion / edicion
 // ---------------------------------------------------------------------------
 
-/** Abre el modal en modo creación (sin datos previos). */
 function openCreateModal() {
   _editingServerId = null;
-  document.getElementById("modal-title").textContent = "Añadir Servidor";
-  document.getElementById("modal-name").value   = "";
-  document.getElementById("modal-ip").value     = "";
-  document.getElementById("modal-desc").value   = "";
+  document.getElementById("modal-title").textContent = "Anadir servidor";
+  document.getElementById("modal-name").value = "";
+  document.getElementById("modal-ip").value = "";
+  document.getElementById("modal-desc").value = "";
   document.getElementById("modal-active").checked = true;
   openModal();
 }
 
 /**
- * Abre el modal en modo edición cargando los datos del servidor.
+ * Abre el modal en modo edicion cargando los datos del servidor.
  *
  * @param {number} id - ID del servidor a editar.
  */
 async function openEditModal(id) {
   try {
     const servers = await API.getServers();
-    const s = servers.find(srv => srv.id === id);
-    if (!s) throw new Error("Servidor no encontrado");
+    const server = servers.find((item) => item.id === id);
+    if (!server) throw new Error("Servidor no encontrado");
 
     _editingServerId = id;
-    document.getElementById("modal-title").textContent = "Editar Servidor";
-    document.getElementById("modal-name").value   = s.name;
-    document.getElementById("modal-ip").value     = s.ip_address;
-    document.getElementById("modal-desc").value   = s.description || "";
-    document.getElementById("modal-active").checked = s.is_active;
+    document.getElementById("modal-title").textContent = "Editar servidor";
+    document.getElementById("modal-name").value = server.name;
+    document.getElementById("modal-ip").value = server.ip_address;
+    document.getElementById("modal-desc").value = server.description || "";
+    document.getElementById("modal-active").checked = server.is_active;
     openModal();
   } catch (err) {
     showToast("Error al cargar el servidor: " + err.message, "error");
   }
 }
 
-/** Muestra el modal. */
 function openModal() {
   document.getElementById("modal-overlay").classList.add("open");
   document.getElementById("modal-name").focus();
 }
 
-/** Cierra y resetea el modal. */
 function closeModal() {
   document.getElementById("modal-overlay").classList.remove("open");
   _editingServerId = null;
 }
 
 /**
- * Guarda el servidor (crea o actualiza según _editingServerId).
- * Valida los campos obligatorios antes de enviar.
+ * Guarda el servidor creado o editado.
  */
 async function handleSaveServer() {
-  const name   = document.getElementById("modal-name").value.trim();
-  const ip     = document.getElementById("modal-ip").value.trim();
-  const desc   = document.getElementById("modal-desc").value.trim();
+  const name = document.getElementById("modal-name").value.trim();
+  const ip = document.getElementById("modal-ip").value.trim();
+  const desc = document.getElementById("modal-desc").value.trim();
   const active = document.getElementById("modal-active").checked;
 
   if (!name || !ip) {
@@ -147,7 +148,12 @@ async function handleSaveServer() {
     return;
   }
 
-  const payload = { name, ip_address: ip, description: desc || null, is_active: active };
+  const payload = {
+    name,
+    ip_address: ip,
+    description: desc || null,
+    is_active: active,
+  };
 
   try {
     if (_editingServerId !== null) {
@@ -157,6 +163,7 @@ async function handleSaveServer() {
       await API.createServer(payload);
       showToast(`Servidor "${name}" creado.`, "success");
     }
+
     closeModal();
     await refreshServersTable();
     await refreshDashboard();
@@ -170,32 +177,45 @@ async function handleSaveServer() {
 // ---------------------------------------------------------------------------
 
 /**
- * Lanza un ping manual al servidor y muestra el resultado en un toast.
+ * Lanza un ping manual al servidor y refresca la interfaz.
  *
  * @param {number} id - ID del servidor.
  */
 async function handleManualPing(id) {
-  showToast("Lanzando ping…", "success");
+  showToast("Lanzando ping...", "success");
+
   try {
-    const res = await API.pingServer(id);
-    if (res.success) {
-      showToast(`✓ ${res.ip_address} responde en ${res.response_ms?.toFixed(1)} ms`, "success");
-    } else {
-      showToast(`✗ ${res.ip_address} sin respuesta: ${res.error}`, "error");
+    const result = await API.pingServer(id);
+    await Promise.all([
+      refreshServersTable(),
+      refreshDashboard(),
+      refreshLogsTable(),
+    ]);
+
+    if (result.success) {
+      const latency = result.response_ms != null
+        ? `${result.response_ms.toFixed(1)} ms`
+        : "sin latencia medida";
+      showToast(`${result.server_name} actualizado: ${latency}`, "success");
+      return;
     }
+
+    showToast(`${result.server_name} sin respuesta: ${result.error}`, "error");
   } catch (err) {
     showToast("Error en ping: " + err.message, "error");
   }
 }
 
 /**
- * Pide confirmación y elimina un servidor.
+ * Pide confirmacion y elimina un servidor.
  *
- * @param {number} id   - ID del servidor.
- * @param {string} name - Nombre del servidor (para el mensaje de confirmación).
+ * @param {number} id - ID del servidor.
+ * @param {string} name - Nombre del servidor.
  */
 async function handleDeleteServer(id, name) {
-  if (!confirm(`¿Eliminar el servidor "${name}"?\nSe borrarán también todos sus registros de comprobación.`)) return;
+  if (!confirm(`Eliminar el servidor "${name}"?\nSe borraran tambien todos sus registros de comprobacion.`)) {
+    return;
+  }
 
   try {
     await API.deleteServer(id);
@@ -209,14 +229,13 @@ async function handleDeleteServer(id, name) {
 
 // ---------------------------------------------------------------------------
 // Registro de eventos del modal
-// Los eventos globales (botón Añadir, etc.) se registran en app.js
 // ---------------------------------------------------------------------------
+
 document.getElementById("btn-modal-save").addEventListener("click", handleSaveServer);
 document.getElementById("btn-modal-cancel").addEventListener("click", closeModal);
 document.getElementById("modal-close").addEventListener("click", closeModal);
 document.getElementById("btn-add-server").addEventListener("click", openCreateModal);
 
-// Cerrar modal al hacer clic fuera del cuadro
-document.getElementById("modal-overlay").addEventListener("click", (e) => {
-  if (e.target === document.getElementById("modal-overlay")) closeModal();
+document.getElementById("modal-overlay").addEventListener("click", (event) => {
+  if (event.target === document.getElementById("modal-overlay")) closeModal();
 });

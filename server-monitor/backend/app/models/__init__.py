@@ -8,7 +8,7 @@ Define las tablas del proyecto:
 =============================================================
 """
 
-from datetime import datetime, timezone
+from datetime import datetime
 
 from sqlalchemy import (
     Boolean, DateTime, Enum, Float,
@@ -17,11 +17,12 @@ from sqlalchemy import (
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base
+from app.core.datetime_utils import utc_now
 
 
 def _utcnow() -> datetime:
     """Devuelve la hora actual en UTC (compatible con Python 3.11+)."""
-    return datetime.now(timezone.utc)
+    return utc_now()
 
 
 # ---------------------------------------------------------------------------

@@ -19,6 +19,7 @@ from datetime import datetime
 import aiosmtplib
 
 from app.core.config import get_settings
+from app.core.datetime_utils import format_datetime_in_spain
 
 
 logger = logging.getLogger(__name__)
@@ -103,7 +104,7 @@ def _build_email_content(
     Devuelve una tupla (subject, html_body, text_body).
     """
 
-    timestamp = checked_at.strftime("%d/%m/%Y %H:%M:%S UTC")
+    timestamp = format_datetime_in_spain(checked_at)
     subject = f"⚠️ ALERTA: Servidor '{server_name}' caído"
 
     html_body = f"""

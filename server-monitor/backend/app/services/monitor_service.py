@@ -15,11 +15,13 @@ módulo; este servicio solo las combina.
 """
 
 import logging
-from datetime import datetime, timezone
+from dataclasses import dataclass
+from datetime import datetime
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import Server, CheckLog
+from app.core.datetime_utils import utc_now
 from app.services.ping_service import ping_host
 from app.services.email_service import send_alert_email
 from app.core.config import get_settings
@@ -28,11 +30,25 @@ from app.core.config import get_settings
 logger = logging.getLogger(__name__)
 
 
+@dataclass(slots=True)
+class CheckExecutionResult:
+    """Structured result for a persisted server check."""
+
+    status: str
+    response_ms: float | None
+    error_message: str | None
+    checked_at: datetime
+
+
 # ---------------------------------------------------------------------------
 # Función pública
 # ---------------------------------------------------------------------------
 
-async def check_server(server: Server, db: AsyncSession) -> None:
+async def check_server(
+    server: Server,
+    db: AsyncSession,
+    send_alerts: bool = True,
+) -> CheckExecutionResult:
     """
     Realiza la comprobación completa de un servidor.
 
@@ -55,7 +71,7 @@ async def check_server(server: Server, db: AsyncSession) -> None:
         timeout=cfg.ping_timeout_seconds,
     )
 
-    now = datetime.now(timezone.utc)
+    now = utc_now()
     new_status = "up" if result.success else "down"
     previous_status = server.last_status
 
@@ -88,7 +104,7 @@ async def check_server(server: Server, db: AsyncSession) -> None:
 
     # 4. Enviar alerta solo cuando el servidor acaba de caer
     #    (evitamos spam si lleva varios ciclos caído)
-    if new_status == "down" and previous_status != "down":
+    if send_alerts and new_status == "down" and previous_status != "down":
         logger.warning(
             "Servidor '%s' (%s) ha caído. Enviando alerta por correo.",
             server.name,
@@ -100,6 +116,13 @@ async def check_server(server: Server, db: AsyncSession) -> None:
             error_message=result.error or "Sin respuesta al ping ICMP",
             checked_at=now,
         )
+
+    return CheckExecutionResult(
+        status=new_status,
+        response_ms=result.response_ms,
+        error_message=result.error,
+        checked_at=now,
+    )
 
 
 # ---------------------------------------------------------------------------

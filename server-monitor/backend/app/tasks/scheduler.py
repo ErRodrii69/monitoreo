@@ -13,11 +13,12 @@ ciclo desde la base de datos de configuración.
 
 import asyncio
 import logging
-from datetime import datetime, timezone
+from datetime import datetime
 
 from sqlalchemy import select
 
 from app.core.database import AsyncSessionLocal
+from app.core.datetime_utils import utc_now
 from app.models import Server
 from app.services.monitor_service import check_server
 
@@ -82,31 +83,32 @@ class MonitorScheduler:
         Una ronda fallida (error de BD, excepción inesperada) no detiene
         el scheduler; solo se registra el error en el log.
         """
-        self._last_run_at = datetime.now(timezone.utc)
+        self._last_run_at = utc_now()
         logger.debug("Iniciando ronda de monitorización: %s", self._last_run_at)
 
         try:
             async with AsyncSessionLocal() as db:
-                # Recuperamos solo los servidores marcados como activos
-                servers = await _fetch_active_servers(db)
+                # Recuperamos solo las referencias necesarias para lanzar la ronda.
+                servers = await _fetch_active_server_refs(db)
 
-                if not servers:
-                    logger.debug("No hay servidores activos para comprobar.")
-                    return
+            if not servers:
+                logger.debug("No hay servidores activos para comprobar.")
+                return
 
-                # Lanzamos todas las comprobaciones en paralelo para reducir
-                # el tiempo total de la ronda (especialmente con muchos servidores)
-                tasks = [check_server(server, db) for server in servers]
-                results = await asyncio.gather(*tasks, return_exceptions=True)
+            # Cada comprobacion usa su propia sesion de BD.
+            # AsyncSession no es segura para escrituras concurrentes compartidas.
+            tasks = [_check_server_in_isolated_session(server_id) for server_id, _ in servers]
+            results = await asyncio.gather(*tasks, return_exceptions=True)
 
-                # Registramos cualquier excepción individual sin abortar el resto
-                for server, result in zip(servers, results):
-                    if isinstance(result, Exception):
-                        logger.error(
-                            "Error al comprobar '%s': %s", server.name, result
-                        )
-
-                await db.commit()
+            # Registramos cualquier excepción individual sin abortar el resto
+            for (server_id, server_name), result in zip(servers, results):
+                if isinstance(result, Exception):
+                    logger.error(
+                        "Error al comprobar '%s' (id=%s): %s",
+                        server_name,
+                        server_id,
+                        result,
+                    )
 
         except Exception as exc:
             logger.error("Error en la ronda de monitorización: %s", exc, exc_info=True)
@@ -130,10 +132,22 @@ class MonitorScheduler:
 # Función auxiliar de consulta
 # ---------------------------------------------------------------------------
 
-async def _fetch_active_servers(db) -> list[Server]:
+async def _fetch_active_server_refs(db) -> list[tuple[int, str]]:
     """
-    Consulta la BD y devuelve la lista de servidores con is_active = True.
-    Responsabilidad única: consulta de servidores activos.
+    Consulta la BD y devuelve las referencias minimas de los servidores activos.
     """
-    result = await db.execute(select(Server).where(Server.is_active.is_(True)))
-    return list(result.scalars().all())
+    result = await db.execute(
+        select(Server.id, Server.name).where(Server.is_active.is_(True))
+    )
+    return [(row.id, row.name) for row in result.all()]
+
+
+async def _check_server_in_isolated_session(server_id: int) -> None:
+    """Ejecuta una comprobacion usando una sesion propia de base de datos."""
+    async with AsyncSessionLocal() as db:
+        server = await db.get(Server, server_id)
+        if server is None or not server.is_active:
+            return
+
+        await check_server(server, db)
+        await db.commit()

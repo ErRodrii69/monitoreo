@@ -11,8 +11,9 @@ responsabilidad única.
 from datetime import datetime
 from typing import Optional
 
-from pydantic import BaseModel, Field, field_validator
-import re
+from pydantic import BaseModel, Field, field_serializer, field_validator
+
+from app.core.datetime_utils import ensure_utc, serialize_datetime
 
 
 # ---------------------------------------------------------------------------
@@ -68,6 +69,15 @@ class ServerOut(BaseModel):
 
     model_config = {"from_attributes": True}
 
+    @field_validator("last_checked_at", "created_at", "updated_at", mode="before")
+    @classmethod
+    def normalize_dt(cls, value: Optional[datetime]) -> datetime | None:
+        return ensure_utc(value)
+
+    @field_serializer("last_checked_at", "created_at", "updated_at", when_used="json")
+    def serialize_dt(self, value: Optional[datetime]) -> str | None:
+        return serialize_datetime(value)
+
 
 # ---------------------------------------------------------------------------
 # Log de comprobación
@@ -84,6 +94,45 @@ class CheckLogOut(BaseModel):
     checked_at: datetime
 
     model_config = {"from_attributes": True}
+
+    @field_validator("checked_at", mode="before")
+    @classmethod
+    def normalize_dt(cls, value: datetime) -> datetime:
+        normalized = ensure_utc(value)
+        assert normalized is not None
+        return normalized
+
+    @field_serializer("checked_at", when_used="json")
+    def serialize_dt(self, value: datetime) -> str:
+        serialized = serialize_datetime(value)
+        assert serialized is not None
+        return serialized
+
+
+class ManualPingOut(BaseModel):
+    """Resultado de una comprobacion manual persistida."""
+
+    server_id: int
+    server_name: str
+    ip_address: str
+    success: bool
+    last_status: str
+    response_ms: Optional[float]
+    error: Optional[str]
+    checked_at: datetime
+
+    @field_validator("checked_at", mode="before")
+    @classmethod
+    def normalize_dt(cls, value: datetime) -> datetime:
+        normalized = ensure_utc(value)
+        assert normalized is not None
+        return normalized
+
+    @field_serializer("checked_at", when_used="json")
+    def serialize_dt(self, value: datetime) -> str:
+        serialized = serialize_datetime(value)
+        assert serialized is not None
+        return serialized
 
 
 # ---------------------------------------------------------------------------

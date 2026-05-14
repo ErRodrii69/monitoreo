@@ -1,32 +1,34 @@
 /**
- * app.js — Orquestador principal de la SPA
+ * app.js - Orquestador principal de la SPA
  *
  * Responsabilidades:
- *  - Navegación entre vistas.
- *  - Ciclo de refresco automático con cuenta atrás.
+ *  - Navegacion entre vistas.
+ *  - Ciclo de refresco automatico con cuenta atras.
  *  - Sistema de toasts.
  *  - Utilidades compartidas (formateo de fechas, escape HTML).
  *
- * Este fichero debe cargarse ÚLTIMO porque usa funciones de los
- * demás módulos JS.
+ * Este fichero debe cargarse ultimo porque usa funciones de los
+ * demas modulos JS.
  */
 
 // ---------------------------------------------------------------------------
-// Navegación entre vistas
+// Navegacion entre vistas
 // ---------------------------------------------------------------------------
 
-/** Mapa de id-de-vista → función de carga de datos */
+/** Mapa de id-de-vista -> funcion de carga de datos */
 const VIEW_LOADERS = {
   dashboard: refreshDashboard,
-  servers:   refreshServersTable,
-  logs:      refreshLogsTable,
-  settings:  loadSettings,
+  servers: refreshServersTable,
+  logs: refreshLogsTable,
+  settings: loadSettings,
 };
+
+const DISPLAY_TIMEZONE = "Europe/Madrid";
 
 let _currentView = "dashboard";
 
 /**
- * Muestra la vista indicada y oculta las demás.
+ * Muestra la vista indicada y oculta las demas.
  * Carga los datos de la vista activa.
  *
  * @param {string} viewName - Identificador de la vista.
@@ -34,66 +36,57 @@ let _currentView = "dashboard";
 function navigateTo(viewName) {
   _currentView = viewName;
 
-  // Ocultar todas las vistas
-  document.querySelectorAll(".view").forEach(v => v.classList.remove("active"));
-  // Mostrar la seleccionada
+  document.querySelectorAll(".view").forEach((view) => view.classList.remove("active"));
   document.getElementById(`view-${viewName}`)?.classList.add("active");
 
-  // Actualizar estado activo en la barra de navegación
-  document.querySelectorAll(".nav-btn").forEach(btn => {
+  document.querySelectorAll(".nav-btn").forEach((btn) => {
     btn.classList.toggle("active", btn.dataset.view === viewName);
   });
 
-  // Cargar los datos de la vista
   const loader = VIEW_LOADERS[viewName];
   if (loader) loader();
 }
 
-// Registramos los clics de la barra de navegación
-document.querySelectorAll(".nav-btn").forEach(btn => {
+document.querySelectorAll(".nav-btn").forEach((btn) => {
   btn.addEventListener("click", () => navigateTo(btn.dataset.view));
 });
 
 // ---------------------------------------------------------------------------
-// Ciclo de refresco automático
+// Ciclo de refresco automatico
 // ---------------------------------------------------------------------------
 
-let _refreshIntervalId  = null;
+let _refreshIntervalId = null;
 let _countdownIntervalId = null;
 let _secondsUntilRefresh = 60;
 
 /**
- * Inicia el ciclo de refresco automático.
+ * Inicia el ciclo de refresco automatico.
  * El intervalo se obtiene de la API de ajustes para mantenerse sincronizado.
  */
 async function startAutoRefresh() {
-  // Recuperamos el intervalo configurado en el backend
   let intervalSeconds = 60;
   try {
     const cfg = await API.getSettings();
     intervalSeconds = cfg.check_interval_seconds || 60;
-  } catch (_) { /* usamos el valor por defecto */ }
+  } catch (_) {
+    // Usamos el valor por defecto si la API falla.
+  }
 
   _secondsUntilRefresh = intervalSeconds;
   updateCountdownDisplay();
 
-  // Limpiamos ciclos anteriores si los hay
   clearInterval(_refreshIntervalId);
   clearInterval(_countdownIntervalId);
 
-  // Refresco de datos
   _refreshIntervalId = setInterval(async () => {
-    // Siempre refrescamos el dashboard (datos en segundo plano)
     await refreshDashboard();
-    // Si estamos en otra vista, también la refrescamos
+
     const loader = VIEW_LOADERS[_currentView];
     if (loader && _currentView !== "dashboard") loader();
 
-    // Relanzamos para recoger posibles cambios de intervalo
     startAutoRefresh();
   }, intervalSeconds * 1000);
 
-  // Cuenta atrás en la cabecera
   _countdownIntervalId = setInterval(() => {
     _secondsUntilRefresh = Math.max(0, _secondsUntilRefresh - 1);
     updateCountdownDisplay();
@@ -106,9 +99,10 @@ async function startAutoRefresh() {
 function updateCountdownDisplay() {
   const el = document.getElementById("next-check-countdown");
   if (!el) return;
-  const m = String(Math.floor(_secondsUntilRefresh / 60)).padStart(2, "0");
-  const s = String(_secondsUntilRefresh % 60).padStart(2, "0");
-  el.textContent = `${m}:${s}`;
+
+  const minutes = String(Math.floor(_secondsUntilRefresh / 60)).padStart(2, "0");
+  const seconds = String(_secondsUntilRefresh % 60).padStart(2, "0");
+  el.textContent = `${minutes}:${seconds}`;
 }
 
 // ---------------------------------------------------------------------------
@@ -119,12 +113,12 @@ function updateCountdownDisplay() {
  * Muestra un mensaje toast temporal en la esquina inferior derecha.
  *
  * @param {string} message - Texto del mensaje.
- * @param {"success"|"error"} type - Tipo de toast (color).
+ * @param {"success"|"error"} type - Tipo de toast.
  * @param {number} duration - Milisegundos antes de desaparecer.
  */
 function showToast(message, type = "success", duration = 4000) {
   const container = document.getElementById("toast-container");
-  const icon = type === "success" ? "✓" : "✗";
+  const icon = type === "success" ? "&#10003;" : "&#10005;";
 
   const toast = document.createElement("div");
   toast.className = `toast ${type}`;
@@ -132,7 +126,6 @@ function showToast(message, type = "success", duration = 4000) {
 
   container.appendChild(toast);
 
-  // Auto-eliminar tras la duración indicada
   setTimeout(() => {
     toast.style.opacity = "0";
     toast.style.transition = "opacity .3s";
@@ -156,22 +149,53 @@ function escapeHtml(str) {
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
 }
 
 /**
- * Formatea una cadena ISO 8601 como fecha y hora local legible.
+ * Convierte una fecha devuelta por la API en un objeto Date fiable.
+ * Si la marca viene sin offset (caso habitual de SQLite), se interpreta como UTC.
+ *
+ * @param {string} rawValue - Fecha en formato ISO o similar.
+ * @returns {Date|null} Fecha parseada o null si no es valida.
+ */
+function parseApiDate(rawValue) {
+  if (!rawValue) return null;
+
+  const baseValue = String(rawValue).trim();
+  if (!baseValue) return null;
+
+  const isoValue = baseValue.includes("T")
+    ? baseValue
+    : baseValue.replace(" ", "T");
+
+  const hasOffset = /(?:Z|[+-]\d{2}:\d{2})$/i.test(isoValue);
+  const normalizedValue = hasOffset ? isoValue : `${isoValue}Z`;
+  const parsed = new Date(normalizedValue);
+
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
+/**
+ * Formatea una cadena ISO 8601 como fecha y hora en la zona de Espana.
  *
  * @param {string} isoString - Fecha en formato ISO 8601.
  * @returns {string} Fecha formateada.
  */
 function formatDateTime(isoString) {
-  if (!isoString) return "—";
+  if (!isoString) return "--";
+
   try {
+    const date = parseApiDate(isoString);
+    if (!date) return isoString;
+
     return new Intl.DateTimeFormat("es-ES", {
       dateStyle: "short",
       timeStyle: "medium",
-    }).format(new Date(isoString));
+      hour12: false,
+      timeZone: DISPLAY_TIMEZONE,
+    }).format(date);
   } catch (_) {
     return isoString;
   }
@@ -179,16 +203,19 @@ function formatDateTime(isoString) {
 
 /**
  * Devuelve el tiempo transcurrido desde una fecha en formato relativo.
- * Ej: "hace 3 minutos", "hace 1 hora".
  *
  * @param {string} isoString - Fecha en formato ISO 8601.
  * @returns {string} Tiempo relativo.
  */
 function formatRelativeTime(isoString) {
   if (!isoString) return "nunca";
+
   try {
-    const diff = (Date.now() - new Date(isoString).getTime()) / 1000; // segundos
-    if (diff < 60)   return "hace unos segundos";
+    const date = parseApiDate(isoString);
+    if (!date) return isoString;
+
+    const diff = (Date.now() - date.getTime()) / 1000;
+    if (diff < 60) return "hace unos segundos";
     if (diff < 3600) return `hace ${Math.floor(diff / 60)} min`;
     if (diff < 86400) return `hace ${Math.floor(diff / 3600)} h`;
     return `hace ${Math.floor(diff / 86400)} d`;
@@ -202,8 +229,6 @@ function formatRelativeTime(isoString) {
 // ---------------------------------------------------------------------------
 
 document.addEventListener("DOMContentLoaded", async () => {
-  // Cargar la vista inicial
   navigateTo("dashboard");
-  // Iniciar el refresco automático
   await startAutoRefresh();
 });
