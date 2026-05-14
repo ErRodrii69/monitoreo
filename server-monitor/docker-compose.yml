@@ -1,0 +1,48 @@
+# =============================================================
+# docker-compose.yml — Aplicación completa (backend + frontend)
+#
+# Extiende docker-compose.base.yml (BD separada).
+#
+# Arranque completo:
+#   docker compose -f docker-compose.base.yml -f docker-compose.yml up -d
+#
+# O usando el atajo del Makefile:
+#   make up
+# =============================================================
+
+include:
+  - docker-compose.base.yml   # Hereda el servicio 'db'
+
+services:
+
+  # -----------------------------------------------------------
+  # Backend: FastAPI + Uvicorn
+  # -----------------------------------------------------------
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: serverwatch-backend
+    restart: unless-stopped
+    environment:
+      DATABASE_URL:              postgresql+asyncpg://${POSTGRES_USER:-monitor}:${POSTGRES_PASSWORD:-monitor}@db:5432/${POSTGRES_DB:-servermonitor}
+      SMTP_HOST:                 ${SMTP_HOST:-smtp.gmail.com}
+      SMTP_PORT:                 ${SMTP_PORT:-587}
+      SMTP_USER:                 ${SMTP_USER:-}
+      SMTP_PASSWORD:             ${SMTP_PASSWORD:-}
+      SMTP_FROM:                 ${SMTP_FROM:-}
+      ALERT_EMAIL_TO:            ${ALERT_EMAIL_TO:-}
+      CHECK_INTERVAL_SECONDS:    ${CHECK_INTERVAL_SECONDS:-60}
+      PING_TIMEOUT_SECONDS:      ${PING_TIMEOUT_SECONDS:-3}
+      PING_COUNT:                ${PING_COUNT:-1}
+    volumes:
+      # Montamos el frontend para que FastAPI lo sirva estáticamente
+      - ./frontend:/app/frontend:ro
+    ports:
+      - "${BACKEND_PORT:-8000}:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+    # El contenedor necesita NET_RAW para enviar paquetes ICMP (ping)
+    cap_add:
+      - NET_RAW
