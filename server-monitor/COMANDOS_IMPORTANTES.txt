@@ -1,0 +1,140 @@
+COMANDOS IMPORTANTES - SERVERWATCH
+==================================
+
+Carpeta del proyecto:
+
+cd "C:\Users\Pc\Desktop\proyecto monitorizacion\server-monitor"
+
+
+1) ARRANCAR CON DOCKER
+----------------------
+
+Arranca PostgreSQL, backend Django y worker de monitorizacion:
+
+docker compose up -d --build
+
+Abrir la web:
+
+http://localhost:8000
+
+Ver estado de contenedores:
+
+docker compose ps
+
+Ver logs de todo:
+
+docker compose logs -f
+
+Ver logs solo del backend:
+
+docker compose logs -f backend
+
+Ver logs solo del monitor:
+
+docker compose logs -f monitor
+
+
+2) APAGAR DOCKER
+----------------
+
+Parar backend, monitor y PostgreSQL:
+
+docker compose down
+
+
+3) VER SERVIDORES EN DOCKER / POSTGRESQL
+----------------------------------------
+
+Ver los servidores registrados:
+
+docker compose exec db psql -U monitor -d servermonitor -c "SELECT id, name, ip_address, is_active, last_status, last_checked_at FROM servers ORDER BY id;"
+
+Ver los ultimos check_logs:
+
+docker compose exec db psql -U monitor -d servermonitor -c "SELECT id, server_id, check_type, target, status, response_ms, checked_at FROM check_logs ORDER BY checked_at DESC LIMIT 20;"
+
+Entrar a PostgreSQL en modo interactivo:
+
+docker compose exec db psql -U monitor -d servermonitor
+
+Salir de PostgreSQL interactivo:
+
+\q
+
+
+4) ARRANCAR DJANGO LOCAL SIN DOCKER
+-----------------------------------
+
+Ir al backend:
+
+cd "C:\Users\Pc\Desktop\proyecto monitorizacion\server-monitor\backend"
+
+Crear entorno virtual si no existe:
+
+python -m venv .venv
+
+Instalar dependencias:
+
+.\.venv\Scripts\python.exe -m pip install -r requirements.txt
+
+Aplicar migraciones:
+
+.\.venv\Scripts\python.exe manage.py migrate
+
+Arrancar servidor Django:
+
+.\.venv\Scripts\python.exe manage.py runserver
+
+Abrir la web local:
+
+http://127.0.0.1:8000
+
+
+5) APAGAR DJANGO LOCAL
+----------------------
+
+En la terminal donde esta corriendo Django:
+
+Ctrl + C
+
+Si no responde:
+
+Ctrl + Break
+
+
+6) ARRANCAR MONITOR LOCAL SIN DOCKER
+------------------------------------
+
+En otra terminal:
+
+cd "C:\Users\Pc\Desktop\proyecto monitorizacion\server-monitor\backend"
+.\.venv\Scripts\python.exe manage.py monitor_scheduler
+
+Parar el monitor local:
+
+Ctrl + C
+
+
+7) COMANDOS UTILES DE DJANGO
+----------------------------
+
+Comprobar configuracion:
+
+.\.venv\Scripts\python.exe manage.py check
+
+Crear usuario administrador:
+
+.\.venv\Scripts\python.exe manage.py createsuperuser
+
+Abrir admin:
+
+http://127.0.0.1:8000/admin/
+
+
+8) NOTAS RAPIDAS
+----------------
+
+- Docker usa PostgreSQL dentro del contenedor serverwatch-db.
+- Django local sin Docker usa backend\server_monitor.sqlite3.
+- server_monitor.db era una base antigua y no es la que usa la web actual.
+- Si una ruta tiene espacios, usa comillas con cd.
