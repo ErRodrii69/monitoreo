@@ -77,6 +77,31 @@ incidents
 app_settings
 
 
+3.1) COPIAR DATOS DE DOCKER A LOS SQLITE LOCALES
+------------------------------------------------
+
+Docker/PostgreSQL es la base principal. Los ficheros SQLite:
+
+backend\server_monitor.sqlite3
+backend\server_monitor.db
+
+son copias locales para poder verlos en VS Code.
+
+Para copiar los servers y check_logs desde Docker/PostgreSQL a esos SQLite:
+
+cd "C:\Users\Pc\Desktop\proyecto monitorizacion\server-monitor\backend"
+.\.venv\Scripts\python.exe manage.py sync_sqlite_copies
+
+Despues de ejecutar ese comando, refresca la tabla en VS Code.
+
+Nota:
+
+Si anades un servidor nuevo desde la web Docker, se guarda primero en PostgreSQL.
+Para verlo tambien en server_monitor.sqlite3 y server_monitor.db, vuelve a ejecutar:
+
+.\.venv\Scripts\python.exe manage.py sync_sqlite_copies
+
+
 4) ARRANCAR DJANGO LOCAL SINCRONIZADO CON DOCKER
 ------------------------------------------------
 
