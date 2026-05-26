@@ -61,9 +61,44 @@ Salir de PostgreSQL interactivo:
 
 \q
 
+Ver la base con DBeaver, pgAdmin u otro visor:
 
-4) ARRANCAR DJANGO LOCAL SIN DOCKER
------------------------------------
+Host: localhost
+Puerto: 5432
+Base de datos: servermonitor
+Usuario: monitor
+Password: monitor
+
+Tablas importantes:
+
+servers
+check_logs
+incidents
+app_settings
+
+
+4) ARRANCAR DJANGO LOCAL SINCRONIZADO CON DOCKER
+------------------------------------------------
+
+IMPORTANTE:
+
+El archivo backend\.env apunta a PostgreSQL de Docker:
+
+DATABASE_URL=postgresql://monitor:monitor@localhost:5432/servermonitor
+
+Eso significa que Django local y Docker usan la misma base de datos.
+Si anades un servidor en Docker, aparece tambien en Django local.
+Si anades un servidor en Django local, aparece tambien en Docker.
+
+Antes de arrancar Django local, PostgreSQL de Docker debe estar encendido.
+Puedes arrancar todo Docker:
+
+cd "C:\Users\Pc\Desktop\proyecto monitorizacion\server-monitor"
+docker compose up -d --build
+
+O arrancar solo PostgreSQL:
+
+docker compose up -d db
 
 Ir al backend:
 
@@ -81,13 +116,21 @@ Aplicar migraciones:
 
 .\.venv\Scripts\python.exe manage.py migrate
 
-Arrancar servidor Django:
+Arrancar servidor Django en el puerto 8000:
 
 .\.venv\Scripts\python.exe manage.py runserver
+
+Si Docker backend ya esta usando el puerto 8000, arranca Django local en 8001:
+
+.\.venv\Scripts\python.exe manage.py runserver 127.0.0.1:8001
 
 Abrir la web local:
 
 http://127.0.0.1:8000
+
+O si usaste el puerto 8001:
+
+http://127.0.0.1:8001
 
 
 5) APAGAR DJANGO LOCAL
@@ -135,6 +178,8 @@ http://127.0.0.1:8000/admin/
 ----------------
 
 - Docker usa PostgreSQL dentro del contenedor serverwatch-db.
-- Django local sin Docker usa backend\server_monitor.sqlite3.
+- Django local ahora tambien usa PostgreSQL de Docker si backend\.env mantiene DATABASE_URL=postgresql://monitor:monitor@localhost:5432/servermonitor.
+- Si quieres volver a SQLite local, comenta o borra DATABASE_URL en backend\.env.
 - server_monitor.db era una base antigua y no es la que usa la web actual.
 - Si una ruta tiene espacios, usa comillas con cd.
+- No borres las tablas servers ni check_logs: son las tablas reales que usa la aplicacion.
