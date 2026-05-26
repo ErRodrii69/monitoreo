@@ -62,6 +62,7 @@ class Server(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
+        db_table = "servers"
         ordering = ["name"]
 
     def __str__(self) -> str:
@@ -105,10 +106,11 @@ class CheckLog(models.Model):
     checked_at = models.DateTimeField(default=timezone.now, db_index=True)
 
     class Meta:
+        db_table = "check_logs"
         ordering = ["-checked_at"]
         indexes = [
-            models.Index(fields=["server", "-checked_at"]),
-            models.Index(fields=["status", "-checked_at"]),
+            models.Index(fields=["server", "-checked_at"], name="check_logs_server__ae62e1_idx"),
+            models.Index(fields=["status", "-checked_at"], name="check_logs_status_5a4bab_idx"),
         ]
 
     def __str__(self) -> str:
@@ -131,10 +133,11 @@ class Incident(models.Model):
     recovery_notified_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
+        db_table = "incidents"
         ordering = ["-started_at"]
         indexes = [
-            models.Index(fields=["status", "-started_at"]),
-            models.Index(fields=["server", "check_type", "target", "status"]),
+            models.Index(fields=["status", "-started_at"], name="incidents_status_604ac3_idx"),
+            models.Index(fields=["server", "check_type", "target", "status"], name="incidents_server__f43998_idx"),
         ]
 
     def __str__(self) -> str:
@@ -168,6 +171,7 @@ class AppSetting(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
+        db_table = "app_settings"
         verbose_name = "Ajuste de aplicacion"
         verbose_name_plural = "Ajustes de aplicacion"
 
