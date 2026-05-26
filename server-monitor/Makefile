@@ -1,39 +1,39 @@
-# =============================================================
-# Makefile — Atajos para tareas habituales del proyecto
-# =============================================================
+COMPOSE = docker compose
 
-COMPOSE_FILES = -f docker-compose.base.yml -f docker-compose.yml
+.PHONY: up down build logs logs-web logs-monitor ps migrate superuser shell dump-db db
 
-.PHONY: up down logs ps build restart shell-back
-
-## Levanta todos los servicios (BD + backend)
 up:
-	docker compose $(COMPOSE_FILES) up -d --build
+	$(COMPOSE) up -d --build
 
-## Detiene todos los servicios
 down:
-	docker compose $(COMPOSE_FILES) down
+	$(COMPOSE) down
 
-## Solo la base de datos
-db:
-	docker compose -f docker-compose.base.yml up -d
-
-## Muestra los logs del backend en tiempo real
-logs:
-	docker compose $(COMPOSE_FILES) logs -f backend
-
-## Estado de los contenedores
-ps:
-	docker compose $(COMPOSE_FILES) ps
-
-## Reconstruye las imágenes sin caché
 build:
-	docker compose $(COMPOSE_FILES) build --no-cache
+	$(COMPOSE) build --no-cache
 
-## Reinicia solo el backend
-restart:
-	docker compose $(COMPOSE_FILES) restart backend
+logs:
+	$(COMPOSE) logs -f
 
-## Abre una shell en el contenedor del backend
-shell-back:
-	docker compose $(COMPOSE_FILES) exec backend bash
+logs-web:
+	$(COMPOSE) logs -f backend
+
+logs-monitor:
+	$(COMPOSE) logs -f monitor
+
+ps:
+	$(COMPOSE) ps
+
+db:
+	$(COMPOSE) up -d db
+
+migrate:
+	$(COMPOSE) exec backend python manage.py migrate
+
+superuser:
+	$(COMPOSE) exec backend python manage.py createsuperuser
+
+shell:
+	$(COMPOSE) exec backend python manage.py shell
+
+dump-db:
+	$(COMPOSE) exec db pg_dump -U monitor servermonitor > database_export.sql

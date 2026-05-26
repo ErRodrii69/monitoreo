@@ -1,21 +1,8 @@
-# Python
+.env
+.venv/
 __pycache__/
 *.py[cod]
-*.pyo
-venv/
-.venv/
-*.egg-info/
-
-# Entorno
-.env
-
-# Docker
 *.log
-
-# IDEs
-.idea/
-.vscode/
-*.swp
-
-# macOS
-.DS_Store
+*.sqlite3
+staticfiles/
+database_export.sql

@@ -3,215 +3,255 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>ServerWatch — Monitorización</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Syne:wght@400;600;800&display=swap" rel="stylesheet" />
+  <title>ServerWatch - Monitorizacion</title>
   <link rel="stylesheet" href="/static/css/main.css" />
 </head>
 <body>
-
-<!-- ============================================================
-     CABECERA
-     ============================================================ -->
-<header class="header">
-  <div class="header-brand">
-    <span class="brand-icon">◈</span>
-    <span class="brand-name">ServerWatch</span>
-  </div>
-  <nav class="header-nav">
-    <button class="nav-btn active" data-view="dashboard">Dashboard</button>
-    <button class="nav-btn" data-view="servers">Servidores</button>
-    <button class="nav-btn" data-view="logs">Registros</button>
-    <button class="nav-btn" data-view="settings">Ajustes</button>
-  </nav>
-  <div class="header-status">
-    <span class="scheduler-label">Próxima comprobación:</span>
-    <span id="next-check-countdown" class="countdown">--:--</span>
-  </div>
-</header>
-
-<!-- ============================================================
-     VISTA: DASHBOARD
-     ============================================================ -->
-<main id="view-dashboard" class="view active">
-
-  <!-- Barra de estado global -->
-  <section class="global-status-bar" id="global-status-bar">
-    <div class="status-icon" id="global-icon">◈</div>
-    <div class="status-text">
-      <span class="status-label" id="global-label">Comprobando…</span>
-      <span class="status-sub" id="global-sub">Cargando datos del sistema</span>
+  <header class="app-header">
+    <div class="brand">
+      <span class="brand-mark" aria-hidden="true"></span>
+      <span class="brand-name">ServerWatch</span>
     </div>
-    <div class="status-stats">
-      <div class="stat"><span class="stat-num" id="stat-up">0</span><span class="stat-desc">Operativos</span></div>
-      <div class="stat"><span class="stat-num" id="stat-down">0</span><span class="stat-desc">Caídos</span></div>
-      <div class="stat"><span class="stat-num" id="stat-unknown">0</span><span class="stat-desc">Desconocido</span></div>
+    <nav class="top-nav" aria-label="Principal">
+      <button class="nav-btn active" data-view="dashboard">Dashboard</button>
+      <button class="nav-btn" data-view="servers">Servidores</button>
+      <button class="nav-btn" data-view="logs">Registros</button>
+      <button class="nav-btn" data-view="settings">Ajustes</button>
+    </nav>
+    <div class="refresh-chip">
+      <span>Proxima</span>
+      <strong id="next-check-countdown">--:--</strong>
     </div>
-  </section>
+  </header>
 
-  <!-- Grid de servidores -->
-  <section class="section">
-    <h2 class="section-title">Estado de Servidores</h2>
-    <div class="server-grid" id="dashboard-grid">
-      <div class="loading-placeholder">Cargando servidores…</div>
-    </div>
-  </section>
+  <main id="view-dashboard" class="view active">
+    <section class="summary-strip" aria-label="Resumen">
+      <div class="metric">
+        <span class="metric-value" id="stat-active">0</span>
+        <span class="metric-label">Activos</span>
+      </div>
+      <div class="metric">
+        <span class="metric-value text-ok" id="stat-up">0</span>
+        <span class="metric-label">Operativos</span>
+      </div>
+      <div class="metric">
+        <span class="metric-value text-err" id="stat-down">0</span>
+        <span class="metric-label">Caidos</span>
+      </div>
+      <div class="metric">
+        <span class="metric-value text-warn" id="stat-unknown">0</span>
+        <span class="metric-label">Pendientes</span>
+      </div>
+    </section>
 
-  <!-- Feed de incidencias recientes -->
-  <section class="section">
-    <h2 class="section-title">Incidencias Recientes</h2>
-    <div class="incidents-feed" id="incidents-feed">
-      <div class="loading-placeholder">Cargando registros…</div>
-    </div>
-  </section>
+    <section class="status-banner" id="global-status-bar">
+      <div>
+        <span class="eyebrow">Estado general</span>
+        <h1 id="global-label">Cargando</h1>
+      </div>
+      <p id="global-sub">Sin datos todavia</p>
+    </section>
 
-</main>
+    <section class="content-section">
+      <div class="section-heading">
+        <h2>Servidores</h2>
+        <button class="btn btn-ghost btn-sm" id="btn-refresh-dashboard">Actualizar</button>
+      </div>
+      <div class="server-grid" id="dashboard-grid">
+        <div class="empty-state">Cargando servidores...</div>
+      </div>
+    </section>
 
-<!-- ============================================================
-     VISTA: GESTIÓN DE SERVIDORES (CRUD)
-     ============================================================ -->
-<main id="view-servers" class="view">
+    <section class="content-section">
+      <div class="section-heading">
+        <h2>Incidencias abiertas</h2>
+      </div>
+      <div class="incident-list" id="incidents-feed">
+        <div class="empty-state">Cargando incidencias...</div>
+      </div>
+    </section>
+  </main>
 
-  <section class="section">
-    <div class="section-header">
-      <h2 class="section-title">Servidores</h2>
-      <button class="btn btn-primary" id="btn-add-server">+ Añadir servidor</button>
-    </div>
-    <div class="table-wrapper">
-      <table class="data-table" id="servers-table">
-        <thead>
-          <tr>
-            <th>Nombre</th>
-            <th>IP / Host</th>
-            <th>Estado</th>
-            <th>Latencia</th>
-            <th>Última comprobación</th>
-            <th>Activo</th>
-            <th>Acciones</th>
-          </tr>
-        </thead>
-        <tbody id="servers-tbody">
-          <tr><td colspan="7" class="loading-cell">Cargando…</td></tr>
-        </tbody>
-      </table>
-    </div>
-  </section>
+  <main id="view-servers" class="view">
+    <section class="content-section">
+      <div class="section-heading">
+        <h2>Servidores</h2>
+        <button class="btn btn-primary" id="btn-add-server">Anadir servidor</button>
+      </div>
+      <div class="table-shell">
+        <table class="data-table" id="servers-table">
+          <thead>
+            <tr>
+              <th>Nombre</th>
+              <th>Host</th>
+              <th>Servicios</th>
+              <th>Estado</th>
+              <th>Latencia</th>
+              <th>Ultima</th>
+              <th>Activo</th>
+              <th>Acciones</th>
+            </tr>
+          </thead>
+          <tbody id="servers-tbody">
+            <tr><td colspan="8" class="loading-cell">Cargando...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </main>
 
-</main>
+  <main id="view-logs" class="view">
+    <section class="content-section">
+      <div class="section-heading">
+        <h2>Registros</h2>
+        <button class="btn btn-ghost btn-sm" id="btn-refresh-logs">Actualizar</button>
+      </div>
+      <div class="table-shell">
+        <table class="data-table" id="logs-table">
+          <thead>
+            <tr>
+              <th>Hora</th>
+              <th>Servidor</th>
+              <th>Tipo</th>
+              <th>Objetivo</th>
+              <th>Estado</th>
+              <th>Latencia</th>
+              <th>Error</th>
+            </tr>
+          </thead>
+          <tbody id="logs-tbody">
+            <tr><td colspan="7" class="loading-cell">Cargando...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </main>
 
-<!-- ============================================================
-     VISTA: REGISTROS
-     ============================================================ -->
-<main id="view-logs" class="view">
-  <section class="section">
-    <h2 class="section-title">Historial de Comprobaciones</h2>
-    <div class="table-wrapper">
-      <table class="data-table" id="logs-table">
-        <thead>
-          <tr>
-            <th>Hora</th>
-            <th>Servidor ID</th>
-            <th>Estado</th>
-            <th>Latencia (ms)</th>
-            <th>Error</th>
-          </tr>
-        </thead>
-        <tbody id="logs-tbody">
-          <tr><td colspan="5" class="loading-cell">Cargando…</td></tr>
-        </tbody>
-      </table>
-    </div>
-  </section>
-</main>
-
-<!-- ============================================================
-     VISTA: AJUSTES
-     ============================================================ -->
-<main id="view-settings" class="view">
-  <section class="section settings-section">
-    <h2 class="section-title">Ajustes del Sistema</h2>
-    <p class="section-desc">Los cambios se aplican en tiempo real sin reiniciar el servicio.</p>
-
-    <div class="settings-grid">
-      <div class="settings-group">
-        <h3 class="settings-group-title">Monitorización</h3>
-        <label class="field-label">Intervalo entre comprobaciones (segundos)
-          <input type="number" id="cfg-interval" class="field-input" min="10" max="3600" placeholder="60" />
-        </label>
+  <main id="view-settings" class="view">
+    <section class="content-section settings-layout">
+      <div class="section-heading">
+        <h2>Ajustes</h2>
       </div>
 
-      <div class="settings-group">
-        <h3 class="settings-group-title">Notificaciones</h3>
-        <label class="field-label">Email destino de alertas
-          <input type="email" id="cfg-email-to" class="field-input" placeholder="admin@empresa.com" />
-        </label>
-        <label class="field-label">Servidor SMTP
-          <input type="text" id="cfg-smtp-host" class="field-input" placeholder="smtp.gmail.com" />
-        </label>
-        <label class="field-label">Puerto SMTP
-          <input type="number" id="cfg-smtp-port" class="field-input" placeholder="587" />
-        </label>
-        <label class="field-label">Usuario SMTP
-          <input type="text" id="cfg-smtp-user" class="field-input" placeholder="usuario@gmail.com" />
-        </label>
-        <label class="field-label">Contraseña SMTP
-          <input type="password" id="cfg-smtp-pass" class="field-input" placeholder="(sin cambios)" />
-        </label>
-        <label class="field-label">Remitente (From)
-          <input type="email" id="cfg-smtp-from" class="field-input" placeholder="monitor@empresa.com" />
-        </label>
+      <div class="form-grid">
+        <fieldset class="field-group">
+          <legend>Monitorizacion</legend>
+          <label class="field-label">Intervalo (segundos)
+            <input type="number" id="cfg-interval" class="field-input" min="10" max="3600" />
+          </label>
+          <label class="field-label">Timeout ping (segundos)
+            <input type="number" id="cfg-ping-timeout" class="field-input" min="1" max="30" step="0.5" />
+          </label>
+          <label class="field-label">Paquetes ping
+            <input type="number" id="cfg-ping-count" class="field-input" min="1" max="5" />
+          </label>
+          <label class="field-label">Timeout HTTP (segundos)
+            <input type="number" id="cfg-http-timeout" class="field-input" min="1" max="60" step="0.5" />
+          </label>
+        </fieldset>
+
+        <fieldset class="field-group">
+          <legend>Correo</legend>
+          <label class="field-label">Email destino
+            <input type="email" id="cfg-email-to" class="field-input" placeholder="admin@empresa.com" />
+          </label>
+          <label class="field-label">SMTP host
+            <input type="text" id="cfg-smtp-host" class="field-input" placeholder="smtp.gmail.com" />
+          </label>
+          <label class="field-label">SMTP puerto
+            <input type="number" id="cfg-smtp-port" class="field-input" min="1" max="65535" />
+          </label>
+          <label class="field-label">SMTP usuario
+            <input type="text" id="cfg-smtp-user" class="field-input" />
+          </label>
+          <label class="field-label">SMTP password
+            <input type="password" id="cfg-smtp-pass" class="field-input" placeholder="Sin cambios" />
+          </label>
+          <label class="field-label">Remitente
+            <input type="email" id="cfg-smtp-from" class="field-input" />
+          </label>
+          <label class="check-line">
+            <input type="checkbox" id="cfg-notify-recovery" />
+            <span>Notificar recuperacion</span>
+          </label>
+        </fieldset>
+      </div>
+
+      <div class="form-actions">
+        <button class="btn btn-primary" id="btn-save-settings">Guardar</button>
+        <span class="inline-feedback" id="save-feedback"></span>
+      </div>
+    </section>
+  </main>
+
+  <div class="modal-overlay" id="modal-overlay" aria-hidden="true">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+      <div class="modal-header">
+        <h3 id="modal-title">Anadir servidor</h3>
+        <button class="icon-btn" id="modal-close" aria-label="Cerrar">x</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-grid modal-grid">
+          <fieldset class="field-group">
+            <legend>Servidor</legend>
+            <label class="field-label">Nombre
+              <input type="text" id="modal-name" class="field-input" />
+            </label>
+            <label class="field-label">IP o hostname
+              <input type="text" id="modal-ip" class="field-input" placeholder="192.168.1.10" />
+            </label>
+            <label class="field-label">Descripcion
+              <textarea id="modal-desc" class="field-input field-textarea"></textarea>
+            </label>
+            <label class="check-line">
+              <input type="checkbox" id="modal-active" checked />
+              <span>Activo</span>
+            </label>
+          </fieldset>
+
+          <fieldset class="field-group">
+            <legend>Comprobaciones</legend>
+            <label class="check-line">
+              <input type="checkbox" id="modal-check-ping" checked />
+              <span>Ping ICMP</span>
+            </label>
+            <div class="split-line">
+              <label class="check-line">
+                <input type="checkbox" id="modal-check-ssh" checked />
+                <span>SSH</span>
+              </label>
+              <input type="number" id="modal-ssh-port" class="field-input compact-input" min="1" max="65535" value="22" />
+            </div>
+            <label class="check-line">
+              <input type="checkbox" id="modal-check-http" />
+              <span>HTTP</span>
+            </label>
+            <input type="url" id="modal-http-url" class="field-input" placeholder="http://servidor.local" />
+            <label class="check-line">
+              <input type="checkbox" id="modal-check-https" />
+              <span>HTTPS</span>
+            </label>
+            <input type="url" id="modal-https-url" class="field-input" placeholder="https://servidor.local" />
+            <label class="field-label">Puertos personalizados
+              <input type="text" id="modal-custom-ports" class="field-input" placeholder="25, 3306, 8080" />
+            </label>
+          </fieldset>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-ghost" id="btn-modal-cancel">Cancelar</button>
+        <button class="btn btn-primary" id="btn-modal-save">Guardar</button>
       </div>
     </div>
-
-    <div class="settings-actions">
-      <button class="btn btn-primary" id="btn-save-settings">Guardar ajustes</button>
-      <span class="save-feedback" id="save-feedback"></span>
-    </div>
-  </section>
-</main>
-
-<!-- ============================================================
-     MODAL: CREAR / EDITAR SERVIDOR
-     ============================================================ -->
-<div class="modal-overlay" id="modal-overlay" aria-hidden="true">
-  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title">
-    <div class="modal-header">
-      <h3 id="modal-title">Añadir Servidor</h3>
-      <button class="modal-close" id="modal-close">✕</button>
-    </div>
-    <div class="modal-body">
-      <label class="field-label">Nombre <span class="required">*</span>
-        <input type="text" id="modal-name" class="field-input" placeholder="Web Production" />
-      </label>
-      <label class="field-label">IP o Hostname <span class="required">*</span>
-        <input type="text" id="modal-ip" class="field-input" placeholder="192.168.1.1 o mi.servidor.com" />
-      </label>
-      <label class="field-label">Descripción
-        <textarea id="modal-desc" class="field-input field-textarea" placeholder="Descripción opcional…"></textarea>
-      </label>
-      <label class="field-label toggle-label">
-        <span>Activo</span>
-        <input type="checkbox" id="modal-active" class="toggle-input" checked />
-        <span class="toggle-slider"></span>
-      </label>
-    </div>
-    <div class="modal-footer">
-      <button class="btn btn-ghost" id="btn-modal-cancel">Cancelar</button>
-      <button class="btn btn-primary" id="btn-modal-save">Guardar</button>
-    </div>
   </div>
-</div>
 
-<!-- ============================================================
-     TOAST DE NOTIFICACIONES
-     ============================================================ -->
-<div class="toast-container" id="toast-container"></div>
+  <div class="toast-container" id="toast-container" aria-live="polite"></div>
 
-<script src="/static/js/api.js"></script>
-<script src="/static/js/dashboard.js"></script>
-<script src="/static/js/servers.js"></script>
-<script src="/static/js/logs.js"></script>
-<script src="/static/js/settings.js"></script>
-<script src="/static/js/app.js"></script>
+  <script src="/static/js/api.js"></script>
+  <script src="/static/js/dashboard.js"></script>
+  <script src="/static/js/servers.js"></script>
+  <script src="/static/js/logs.js"></script>
+  <script src="/static/js/settings.js"></script>
+  <script src="/static/js/app.js"></script>
 </body>
 </html>

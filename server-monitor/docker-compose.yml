@@ -1,48 +1,82 @@
-# =============================================================
-# docker-compose.yml — Aplicación completa (backend + frontend)
-#
-# Extiende docker-compose.base.yml (BD separada).
-#
-# Arranque completo:
-#   docker compose -f docker-compose.base.yml -f docker-compose.yml up -d
-#
-# O usando el atajo del Makefile:
-#   make up
-# =============================================================
-
-include:
-  - docker-compose.base.yml   # Hereda el servicio 'db'
-
 services:
+  db:
+    image: postgres:16-alpine
+    container_name: serverwatch-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-monitor}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-monitor}
+      POSTGRES_DB: ${POSTGRES_DB:-servermonitor}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-monitor} -d ${POSTGRES_DB:-servermonitor}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
-  # -----------------------------------------------------------
-  # Backend: FastAPI + Uvicorn
-  # -----------------------------------------------------------
   backend:
     build:
-      context: ./backend
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: backend/Dockerfile
+    image: serverwatch-app:latest
     container_name: serverwatch-backend
     restart: unless-stopped
     environment:
-      DATABASE_URL:              postgresql+asyncpg://${POSTGRES_USER:-monitor}:${POSTGRES_PASSWORD:-monitor}@db:5432/${POSTGRES_DB:-servermonitor}
-      SMTP_HOST:                 ${SMTP_HOST:-smtp.gmail.com}
-      SMTP_PORT:                 ${SMTP_PORT:-587}
-      SMTP_USER:                 ${SMTP_USER:-}
-      SMTP_PASSWORD:             ${SMTP_PASSWORD:-}
-      SMTP_FROM:                 ${SMTP_FROM:-}
-      ALERT_EMAIL_TO:            ${ALERT_EMAIL_TO:-}
-      CHECK_INTERVAL_SECONDS:    ${CHECK_INTERVAL_SECONDS:-60}
-      PING_TIMEOUT_SECONDS:      ${PING_TIMEOUT_SECONDS:-3}
-      PING_COUNT:                ${PING_COUNT:-1}
-    volumes:
-      # Montamos el frontend para que FastAPI lo sirva estáticamente
-      - ./frontend:/app/frontend:ro
+      DATABASE_URL: postgresql://${POSTGRES_USER:-monitor}:${POSTGRES_PASSWORD:-monitor}@db:5432/${POSTGRES_DB:-servermonitor}
+      DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:-dev-only-change-me}
+      DJANGO_ALLOWED_HOSTS: ${DJANGO_ALLOWED_HOSTS:-localhost,127.0.0.1,0.0.0.0}
+      DJANGO_DEBUG: ${DJANGO_DEBUG:-False}
+      CHECK_INTERVAL_SECONDS: ${CHECK_INTERVAL_SECONDS:-60}
+      PING_TIMEOUT_SECONDS: ${PING_TIMEOUT_SECONDS:-3}
+      PING_COUNT: ${PING_COUNT:-1}
+      HTTP_TIMEOUT_SECONDS: ${HTTP_TIMEOUT_SECONDS:-5}
+      SMTP_HOST: ${SMTP_HOST:-smtp.gmail.com}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      SMTP_FROM: ${SMTP_FROM:-}
+      ALERT_EMAIL_TO: ${ALERT_EMAIL_TO:-}
+      NOTIFY_RECOVERY: ${NOTIFY_RECOVERY:-true}
+    command: ["/app/backend/entrypoint.sh", "web"]
     ports:
       - "${BACKEND_PORT:-8000}:8000"
     depends_on:
       db:
         condition: service_healthy
-    # El contenedor necesita NET_RAW para enviar paquetes ICMP (ping)
     cap_add:
       - NET_RAW
+
+  monitor:
+    image: serverwatch-app:latest
+    container_name: serverwatch-monitor
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-monitor}:${POSTGRES_PASSWORD:-monitor}@db:5432/${POSTGRES_DB:-servermonitor}
+      DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:-dev-only-change-me}
+      DJANGO_ALLOWED_HOSTS: ${DJANGO_ALLOWED_HOSTS:-localhost,127.0.0.1,0.0.0.0}
+      DJANGO_DEBUG: ${DJANGO_DEBUG:-False}
+      CHECK_INTERVAL_SECONDS: ${CHECK_INTERVAL_SECONDS:-60}
+      PING_TIMEOUT_SECONDS: ${PING_TIMEOUT_SECONDS:-3}
+      PING_COUNT: ${PING_COUNT:-1}
+      HTTP_TIMEOUT_SECONDS: ${HTTP_TIMEOUT_SECONDS:-5}
+      SMTP_HOST: ${SMTP_HOST:-smtp.gmail.com}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      SMTP_FROM: ${SMTP_FROM:-}
+      ALERT_EMAIL_TO: ${ALERT_EMAIL_TO:-}
+      NOTIFY_RECOVERY: ${NOTIFY_RECOVERY:-true}
+    command: ["/app/backend/entrypoint.sh", "monitor"]
+    depends_on:
+      db:
+        condition: service_healthy
+      backend:
+        condition: service_started
+    cap_add:
+      - NET_RAW
+
+volumes:
+  pgdata:
